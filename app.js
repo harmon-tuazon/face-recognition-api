@@ -59,13 +59,13 @@ app.post('/signin', (req, res) => {
         if (email === user.email) {
             bcrypt.compare(password, user.password, function(err, res) {
                 if (err) {
-                    return res.status(400).send("Wrong User Credentials")
+                    return res.status(400).send({message: "Wrong User Credentials"})
                 } else {
                     return res.json(user)
                 }
             })
         } else {
-            return res.status(400).send("User Not Found")
+            return res.status(400).send({message: "User Not Found"})
         }
     })
 
@@ -95,3 +95,6 @@ app.get('/profile/:id', (req, res) => {
 app.use((req, res) => {
     res.status(404).json()
 })
+
+
+app.listen(3000, () => {console.log('listening to server')})
