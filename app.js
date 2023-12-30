@@ -1,9 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const cors = require('cors');
 require('dotenv').config()
 
 const app = express();
 
+app.use(cors())
 
 const users = [{
     id: 0,
@@ -32,13 +34,21 @@ app.get('/', (req, res) => {
 app.post('/register', (req, res) => {
     const {email, fullname, password} = req.body
 
-    const newUser = users.push({
-                                id: 1,
-                                email: email,
-                                fullname: fullname,
-                                password: password
-                            })
-    res.json(newUser)
+    bcrypt.hash(password, 10, async(err, hashedPassword) => {
+        if (err) {
+            throw new Error(err)
+        } else {
+
+            const newUser = users.push({
+                id: 1,
+                email: email,
+                fullname: fullname,
+                password: hashedPassword
+            })
+            
+            res.status(201)
+        }
+    })  
 })
 
 //Signin
@@ -46,8 +56,14 @@ app.post('/signin', (req, res) => {
     const {email, password} = req.body
 
     users.forEach(user => {
-        if (email === user.email && password === user.password) {
-            return res.json(user)
+        if (email === user.email) {
+            bcrypt.compare(password, user.password, function(err, res) {
+                if (err) {
+                    return res.status(400).send("Wrong User Credentials")
+                } else {
+                    return res.json(user)
+                }
+            })
         } else {
             return res.status(400).send("User Not Found")
         }
