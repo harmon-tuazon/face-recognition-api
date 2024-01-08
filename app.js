@@ -36,7 +36,7 @@ app.post('/register', (req, res) => {
 
     bcrypt.hash(password, 10, async(err, hashedPassword) => {
         if (err) {
-            throw new Error(err)
+            console.log(err)
         } else {
 
             const newUser = users.push({
@@ -59,7 +59,7 @@ app.post('/signin', (req, res) => {
         if (email === user.email) {
             bcrypt.compare(password, user.password, function(err, res) {
                 if (err) {
-                    return res.status(400).send({message: "Wrong User Credentials"})
+                    return res.status(400).send({message: "Wrong Credentials"})
                 } else {
                     return res.json(user)
                 }
