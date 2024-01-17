@@ -1,7 +1,20 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
-require('dotenv').config()
+const knex = require('knex');
+require('dotenv').config();
+
+const db = knex({
+                    client: 'pg',
+                    connection: {
+                    host : '127.0.0.1',
+                    port : 5432,
+                    user : 'postgres',
+                    password : 'monmon',
+                    database : 'smartbrain'
+                    }
+                });
+
 
 const app = express();
 
@@ -27,73 +40,79 @@ app.use(express.json());
 
 //Homepage
 app.get('/', (req, res) => {
-    res.json()
+    res.status(200).json('Welcome')
 })
 
-//Register
 app.post('/register', (req, res) => {
     const {email, fullname, password} = req.body
 
     bcrypt.hash(password, 10, async(err, hashedPassword) => {
         if (err) {
-            console.log(err)
+            res.status(400).json('Error occurred during user creation')
         } else {
-
-            const newUser = users.push({
-                id: 1,
-                email: email,
-                fullname: fullname,
-                password: hashedPassword
-            })
-            
-            res.status(201)
+                db.transaction(trx =>  {
+                    const newLoginCreds = { email: email, hash:hashedPassword }
+                   
+                    trx.insert(newLoginCreds).into('login').returning('email')
+                      .then(loginEmail => { 
+                        const newUser = { email: loginEmail[0].email, name: fullname, joined: new Date() }
+                         trx('users').returning('*').insert(newUser)
+                            .then(user => {res.json(user[0])})
+                    })
+                 .then(trx.commit)
+                 .catch(trx.rollback)
+                })
         }
-    })  
+    })
 })
 
 //Signin
 app.post('/signin', (req, res) => {
     const {email, password} = req.body
 
-    users.forEach(user => {
-        if (email === user.email) {
-            bcrypt.compare(password, user.password, function(err, res) {
-                if (err) {
-                    return res.status(400).send({message: "Wrong Credentials"})
-                } else {
-                    return res.json(user)
-                }
-            })
-        } else {
-            return res.status(400).send({message: "User Not Found"})
-        }
-    })
+    db.select('email', 'hash').from('login').where('email', '=', email)
+        .then(data => {
+           const userIsValid =  bcrypt.compare(password, data[0].hash);
 
+           if (userIsValid) {
+                return db.select('*').from('users').where('email', '=', email)
+                        .then(user => { return res.status(200).json(user[0])})
+                        .catch(err => res.json('Error in Finding User: Unable to find user'))
+            } else {
+                return res.status(400).json("Wrong Credentials")
+            } 
+        })
+        .catch(err => {return res.status(400).json("Wrong Credentials")})
 })
+
 
 //Images
 app.put('/profile/:id/images', (req, res) => {
     const {id} = req.params
-    const specificUser = users.filter(user => {return user.id === id})
-
-    let newEntriesCount = specificUser[0].entries++
-
-    res.json(newEntriesCount)
+    
+    db('users').where('id', '=', id).increment(entries, 1).returning(entries)
+        .then(count => {res.status(200).json(count[0].count)})
+        .catch(err => {res.status(400).json('Error While Updating Count of Entries')})
 })
-
-
 
 //Profile
 app.get('/profile/:id', (req, res) => {
     const {id} = req.params
-    const specificUser = users.filter(user => {return user.id === id})
 
-    res.json(specificUser[0])
+    db.select('*').from('users').where({id})
+    .then(user => {
+        if (user.length) {
+            res.json(user[0])
+        } else {
+            res.status(400).json('User Not Found')
+        }
+    })
+    .catch(err => {res.status(400).json('Error Occured while Finding User')})
 })
 
 // 404 Error Handling
 app.use((req, res) => {
-    res.status(404).json()
+    res.status(404).json('Error in finding URL')
 })
 
 
