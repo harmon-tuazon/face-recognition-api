@@ -35,7 +35,6 @@ app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
 
-
 //ROUTERS
 
 //Homepage
@@ -43,6 +42,8 @@ app.get('/', (req, res) => {
     res.status(200).json('Welcome')
 })
 
+
+//Register
 app.post('/register', (req, res) => {
     const {email, fullname, password} = req.body
 
@@ -71,15 +72,15 @@ app.post('/signin', (req, res) => {
     const {email, password} = req.body
 
     db.select('email', 'hash').from('login').where('email', '=', email)
-        .then(data => {
-           const userIsValid =  bcrypt.compare(password, data[0].hash);
-
-           if (userIsValid) {
+        .then(async (data) => {
+           const userIsValid = await bcrypt.compare(password, data[0].hash);
+           
+           if (!userIsValid) {
+                return  res.status(400).json("Wrong Credentials")
+            } else {
                 return db.select('*').from('users').where('email', '=', email)
                         .then(user => { return res.status(200).json(user[0])})
                         .catch(err => res.json('Error in Finding User: Unable to find user'))
-            } else {
-                return res.status(400).json("Wrong Credentials")
             } 
         })
         .catch(err => {return res.status(400).json("Wrong Credentials")})
