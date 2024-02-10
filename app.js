@@ -1,10 +1,13 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const knex = require('knex');
+const passport = require('passport')
 require('dotenv').config();
+const { getLogOut } = require('./controllers')
 
-const db = knex({
+
+
+export const db = knex({
                     client: 'pg',
                     connection: {
                     host : '127.0.0.1',
@@ -20,19 +23,17 @@ const app = express();
 
 app.use(cors())
 
-const users = [{
-    id: 0,
-    email: 'sample',
-    fullname: 'test',
-    password: 'dummy',
-    entries: 0,
-    createdAt: new Date()
-}]
-
 
 //MIDDLEWARES
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
+app.use(session({ secret: "mysecret", resave: false, saveUninitialized: true }))
+app.use(passport.initialize());
+app.use(passport.session());
+app.use((req, res, next) => {
+    res.locals.user = req.user;
+    next();
+  });
 
 
 //ROUTERS
@@ -68,23 +69,13 @@ app.post('/register', (req, res) => {
 })
 
 //Signin
-app.post('/signin', (req, res) => {
-    const {email, password} = req.body
+app.post('/signin', passport.authenticate("local", {
+    successRedirect: "/",
+    failureRedirect: "/signin"
+}))
 
-    db.select('email', 'hash').from('login').where('email', '=', email)
-        .then(async (data) => {
-           const userIsValid = await bcrypt.compare(password, data[0].hash);
-           
-           if (!userIsValid) {
-                return  res.status(400).json("Wrong Credentials")
-            } else {
-                return db.select('*').from('users').where('email', '=', email)
-                        .then(user => { return res.status(200).json(user[0])})
-                        .catch(err => res.json('Error in Finding User: Unable to find user'))
-            } 
-        })
-        .catch(err => {return res.status(400).json("Wrong Credentials")})
-})
+//Signout
+app.get('/signin', getLogOut)
 
 
 //Images
